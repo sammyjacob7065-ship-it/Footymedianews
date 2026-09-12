@@ -14,7 +14,7 @@ export function generateStaticParams() {
 
 // Re-render this page in the background at most once a minute, so new
 // comments show up without needing a full redeploy.
-export const revalidate = 60;
+export const revalidate = 5;
 
 export function generateMetadata({
   params,
