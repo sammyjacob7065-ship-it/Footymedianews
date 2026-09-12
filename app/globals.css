@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-white text-neutral-900 dark:bg-afh-dark dark:text-neutral-100;
+}
+
+.prose-afh {
+  @apply max-w-none text-[1.05rem] leading-7 text-neutral-800 dark:text-neutral-200;
+}
+.prose-afh p { @apply mb-4; }
+.prose-afh h2 { @apply mt-8 mb-3 text-xl font-bold; }
+.prose-afh h3 { @apply mt-6 mb-2 text-lg font-bold; }
+.prose-afh a { @apply text-afh-green underline; }
