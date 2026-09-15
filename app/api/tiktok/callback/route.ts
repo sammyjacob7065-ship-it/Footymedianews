@@ -1,24 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code");
-  const state = req.nextUrl.searchParams.get("state");
-  const savedState = req.cookies.get("tiktok_oauth_state")?.value;
   const error = req.nextUrl.searchParams.get("error");
 
   if (error) {
     return htmlResponse(`<p>TikTok returned an error: ${error}</p>`);
   }
 
-  if (!code || !state || state !== savedState) {
+  if (!code) {
     return htmlResponse(
-      "<p>Couldn't verify this login attempt (missing or mismatched state). Please try again from /tiktok-login.</p>"
+      "<p>No authorization code received. Please try again from /tiktok-login.</p>"
     );
   }
 
-  const clientKey = process.env.TIKTOK_CLIENT_KEY;
-  const clientSecret = process.env.TIKTOK_CLIENT_SECRET;
-  const redirectUri = process.env.TIKTOK_REDIRECT_URI;
+  const clientKey = process.env.TIKTOK_CLIENT_KEY?.trim();
+  const clientSecret = process.env.TIKTOK_CLIENT_SECRET?.trim();
+  const redirectUri = process.env.TIKTOK_REDIRECT_URI?.trim();
 
   const tokenRes = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
     method: "POST",
@@ -38,8 +39,12 @@ export async function GET(req: NextRequest) {
   const data = await tokenRes.json();
 
   if (!tokenRes.ok || !data.access_token) {
+    const maskedKey = clientKey
+      ? `${clientKey.slice(0, 4)}...${clientKey.slice(-4)} (length ${clientKey.length})`
+      : "MISSING";
     return htmlResponse(
-      `<p>Token exchange failed:</p><pre>${JSON.stringify(data, null, 2)}</pre>`
+      `<p>Token exchange failed:</p><pre>${JSON.stringify(data, null, 2)}</pre>
+       <p style="color:#888">Debug — client key used: ${maskedKey}, redirect_uri used: ${redirectUri}</p>`
     );
   }
 
@@ -58,6 +63,11 @@ export async function GET(req: NextRequest) {
 function htmlResponse(bodyHtml: string) {
   return new NextResponse(
     `<!DOCTYPE html><html><body style="font-family: sans-serif; max-width: 600px; margin: 40px auto; line-height:1.6;">${bodyHtml}</body></html>`,
-    { headers: { "Content-Type": "text/html" } }
+    {
+      headers: {
+        "Content-Type": "text/html",
+        "Cache-Control": "no-store, max-age=0",
+      },
+    }
   );
 }
