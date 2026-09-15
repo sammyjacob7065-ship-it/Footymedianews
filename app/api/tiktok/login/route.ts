@@ -14,9 +14,11 @@ export async function GET(req: NextRequest) {
   }
 
   if (!code || !state || state !== savedState) {
-    return htmlResponse(
-      "<p>Couldn't verify this login attempt (missing or mismatched state). Please try again from /tiktok-login.</p>"
-    );
+    return htmlResponse(`
+      <p>Couldn't verify this login attempt (missing or mismatched state). Please try again from /tiktok-login.</p>
+      <p style="color:#888">Debug — state from TikTok: ${state ?? "MISSING"}<br>
+      state saved in cookie: ${savedState ?? "MISSING (no cookie received at all)"}</p>
+    `);
   }
 
   const clientKey = process.env.TIKTOK_CLIENT_KEY?.trim();
