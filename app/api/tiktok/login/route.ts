@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// Never cache this route — it must generate a fresh state and read the
+// latest env vars on every single request, not a cached/stale response.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(req: NextRequest) {
-  const clientKey = process.env.TIKTOK_CLIENT_KEY;
-  const redirectUri = process.env.TIKTOK_REDIRECT_URI;
+  const clientKey = process.env.TIKTOK_CLIENT_KEY?.trim();
+  const redirectUri = process.env.TIKTOK_REDIRECT_URI?.trim();
 
   if (!clientKey || !redirectUri) {
     return NextResponse.json(
@@ -21,6 +26,7 @@ export async function GET(req: NextRequest) {
   authUrl.searchParams.set("state", state);
 
   const res = NextResponse.redirect(authUrl.toString());
+  res.headers.set("Cache-Control", "no-store, max-age=0");
   res.cookies.set("tiktok_oauth_state", state, {
     httpOnly: true,
     secure: true,
