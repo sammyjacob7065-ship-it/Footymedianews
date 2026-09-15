@@ -67,6 +67,11 @@ export async function GET(req: NextRequest) {
 function htmlResponse(bodyHtml: string) {
   return new NextResponse(
     `<!DOCTYPE html><html><body style="font-family: sans-serif; max-width: 600px; margin: 40px auto; line-height:1.6;">${bodyHtml}</body></html>`,
-    { headers: { "Content-Type": "text/html" } }
+    {
+      headers: {
+        "Content-Type": "text/html",
+        "Cache-Control": "no-store, max-age=0",
+      },
+    }
   );
 }
