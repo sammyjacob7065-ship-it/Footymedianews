@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
-  const token = req.headers.get("x-api-token");
+  const token = req.nextUrl.searchParams.get("key");
   if (!token || token !== process.env.CREATE_POST_TOKEN) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
