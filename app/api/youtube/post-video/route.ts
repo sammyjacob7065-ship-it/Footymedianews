@@ -1,21 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 
-/**
- * POST /api/youtube/post-video
- * Body: { video_url, title, description }
- *
- * Uploads a video to the connected YouTube channel. Google access tokens
- * expire after about an hour, so this always exchanges the long-lived
- * refresh token for a brand-new access token first, rather than relying
- * on a possibly-stale YOUTUBE_ACCESS_TOKEN.
- */
-
 export const maxDuration = 60;
 
-async function getFreshAccessToken() {
+function envSuffix(channel: string) {
+  return channel
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+async function getFreshAccessToken(channel: string) {
   const clientId = process.env.YOUTUBE_CLIENT_ID?.trim();
   const clientSecret = process.env.YOUTUBE_CLIENT_SECRET?.trim();
-  const refreshToken = process.env.YOUTUBE_REFRESH_TOKEN?.trim();
+
+  const suffix = envSuffix(channel);
+  const channelSpecificVar = `YOUTUBE_${suffix}_REFRESH_TOKEN`;
+  const refreshToken =
+    process.env[channelSpecificVar]?.trim() ||
+    process.env.YOUTUBE_REFRESH_TOKEN?.trim();
+
+  if (!refreshToken) {
+    throw new Error(
+      `No refresh token found for channel "${channel}". Expected env var ${channelSpecificVar} (or YOUTUBE_REFRESH_TOKEN as fallback). Connect this channel first at /youtube-login.`
+    );
+  }
 
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -23,7 +31,7 @@ async function getFreshAccessToken() {
     body: new URLSearchParams({
       client_id: clientId!,
       client_secret: clientSecret!,
-      refresh_token: refreshToken!,
+      refresh_token: refreshToken,
       grant_type: "refresh_token",
     }),
   });
@@ -39,9 +47,7 @@ async function getFreshAccessToken() {
   }
 
   if (!res.ok || !data.access_token) {
-    throw new Error(
-      `Couldn't refresh access token: ${JSON.stringify(data)}`
-    );
+    throw new Error(`Couldn't refresh access token: ${JSON.stringify(data)}`);
   }
   return data.access_token as string;
 }
@@ -53,7 +59,8 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { video_url, title, description } = body ?? {};
+  const { video_url, title, description, channel } = body ?? {};
+  const targetChannel = channel || "football";
 
   if (!video_url || !title) {
     return NextResponse.json(
@@ -64,7 +71,7 @@ export async function POST(req: NextRequest) {
 
   let accessToken: string;
   try {
-    accessToken = await getFreshAccessToken();
+    accessToken = await getFreshAccessToken(targetChannel);
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Token refresh failed" },
@@ -72,7 +79,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 1. Fetch the video bytes from Blob storage.
   const videoRes = await fetch(video_url);
   if (!videoRes.ok) {
     return NextResponse.json(
@@ -82,15 +88,9 @@ export async function POST(req: NextRequest) {
   }
   const videoBuffer = await videoRes.arrayBuffer();
 
-  // 2. Start a resumable upload session with YouTube.
   const metadata = {
-    snippet: {
-      title,
-      description: description ?? "",
-    },
-    status: {
-      privacyStatus: "public",
-    },
+    snippet: { title, description: description ?? "" },
+    status: { privacyStatus: "public" },
   };
 
   const initRes = await fetch(
@@ -122,7 +122,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 3. Send the actual video bytes.
   const uploadRes = await fetch(uploadUrl, {
     method: "PUT",
     headers: { "Content-Type": "video/mp4" },
@@ -140,6 +139,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     success: true,
+    channel: targetChannel,
     video_id: uploadData.id,
     video_url: `https://youtube.com/watch?v=${uploadData.id}`,
   });
