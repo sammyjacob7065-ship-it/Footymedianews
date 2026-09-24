@@ -5,10 +5,11 @@ import { upload } from "@vercel/blob/client";
 
 export default function YoutubePostTestPage() {
   const [token, setToken] = useState("");
+  const [channel, setChannel] = useState("football");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [status, setStatus] = useState<
+  const [status, setStatus] = useState
     "idle" | "uploading" | "posting" | "done" | "error"
   >("idle");
   const [progress, setProgress] = useState(0);
@@ -38,14 +39,21 @@ export default function YoutubePostTestPage() {
       const postRes = await fetch("/api/youtube/post-video", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-api-token": token },
-        body: JSON.stringify({ video_url: blob.url, title, description }),
+        body: JSON.stringify({
+          video_url: blob.url,
+          title,
+          description,
+          channel,
+        }),
       });
       const postData = await postRes.json();
       if (!postRes.ok)
         throw new Error(JSON.stringify(postData.details || postData.error));
 
       setStatus("done");
-      setResult(`Uploaded! Watch it here: ${postData.video_url}`);
+      setResult(
+        `Uploaded to "${postData.channel}" channel! Watch it here: ${postData.video_url}`
+      );
     } catch (err) {
       setStatus("error");
       setResult(err instanceof Error ? err.message : "Something went wrong");
@@ -65,6 +73,19 @@ export default function YoutubePostTestPage() {
           required
           className="rounded-md border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 text-sm"
         />
+        <div>
+          <label className="mb-1 block text-xs font-bold uppercase text-neutral-500">
+            Channel
+          </label>
+          <select
+            value={channel}
+            onChange={(e) => setChannel(e.target.value)}
+            className="w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 text-sm"
+          >
+            <option value="football">Football</option>
+            <option value="ai">AI videos</option>
+          </select>
+        </div>
         <input
           type="text"
           value={title}
