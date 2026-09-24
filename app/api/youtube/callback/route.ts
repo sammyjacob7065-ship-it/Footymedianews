@@ -3,8 +3,16 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+function envSuffix(channel: string) {
+  return channel
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code");
+  const channel = req.nextUrl.searchParams.get("state") || "default";
   const error = req.nextUrl.searchParams.get("error");
 
   if (error) {
@@ -45,21 +53,22 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  const suffix = envSuffix(channel);
+  const refreshVarName = `YOUTUBE_${suffix}_REFRESH_TOKEN`;
+
   return htmlResponse(`
-    <p><strong>Connected successfully.</strong> Copy these into Vercel's Environment Variables now — this page won't show them again.</p>
-    <p><strong>YOUTUBE_ACCESS_TOKEN</strong></p>
-    <pre>${data.access_token}</pre>
-    <p><strong>YOUTUBE_REFRESH_TOKEN</strong></p>
+    <p><strong>Connected successfully</strong> for channel: <strong>${channel}</strong></p>
+    <p>Add this to Vercel's Environment Variables — the name matters, it tells the upload route which channel this belongs to:</p>
+    <p><strong>${refreshVarName}</strong></p>
     <pre>${data.refresh_token ?? "(not returned — see note below)"}</pre>
-    <p style="color:#888">Access token expires in ${Math.round(
-      (data.expires_in ?? 0) / 60
-    )} minutes. The refresh token is used to get a new one after that — save it, it won't be shown again.
+    <p style="color:#888">
     ${
       !data.refresh_token
-        ? "If no refresh token shows here, it's likely because you'd already authorized this app before — go to myaccount.google.com/permissions, remove access for this app, then try /youtube-login again."
-        : ""
+        ? "If no refresh token shows here, it's likely because you'd already authorized this app before with this same Google account — go to myaccount.google.com/permissions, remove access for this app, then try /youtube-login again."
+        : "Access token also issued (expires in " + Math.round((data.expires_in ?? 0) / 60) + " min) but isn't needed — the upload route always fetches a fresh one using this refresh token."
     }
     </p>
+    <p>When uploading, use <code>"channel": "${channel}"</code> in the request to /api/youtube/post-video so it picks this token.</p>
   `);
 }
 
