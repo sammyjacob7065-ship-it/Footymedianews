@@ -14,9 +14,7 @@ export default function Header() {
     <header className="sticky top-0 z-50 border-b border-neutral-200 dark:border-neutral-800 bg-white/90 dark:bg-afh-dark/90 backdrop-blur">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
         <Link href="/" className="flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-afh-green text-sm font-black text-white">
-            FM
-          </span>
+          <img src="/logo.png" alt="Footymedia logo" className="h-9 w-9 rounded-md object-cover" />
           <span className="font-serif text-lg font-bold tracking-tight">
             Footymedia
           </span>
