@@ -32,7 +32,7 @@ export default function YoutubePostTestPage() {
         access: "public",
         handleUploadUrl: "/api/tiktok/blob-upload",
         clientPayload: token,
-        onUploadProgress: ({ percentage }) => setProgress(percentage),
+        onUploadProgress: (p) => setProgress(p.percentage),
       });
 
       setStatus("posting");
@@ -41,9 +41,9 @@ export default function YoutubePostTestPage() {
         headers: { "Content-Type": "application/json", "x-api-token": token },
         body: JSON.stringify({
           video_url: blob.url,
-          title,
-          description,
-          channel,
+          title: title,
+          description: description,
+          channel: channel,
         }),
       });
       const postData = await postRes.json();
@@ -52,13 +52,20 @@ export default function YoutubePostTestPage() {
 
       setStatus("done");
       setResult(
-        `Uploaded to "${postData.channel}" channel! Watch it here: ${postData.video_url}`
+        "Uploaded to '" +
+          postData.channel +
+          "' channel! Watch it here: " +
+          postData.video_url
       );
     } catch (err) {
       setStatus("error");
       setResult(err instanceof Error ? err.message : "Something went wrong");
     }
   }
+
+  let buttonText = "Upload & Post";
+  if (status === "uploading") buttonText = "Uploading… " + progress + "%";
+  if (status === "posting") buttonText = "Sending to YouTube…";
 
   return (
     <div className="mx-auto max-w-md px-4 py-16">
@@ -113,11 +120,7 @@ export default function YoutubePostTestPage() {
           disabled={status === "uploading" || status === "posting"}
           className="self-start rounded-md bg-red-600 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
         >
-          {status === "uploading"
-            ? `Uploading… ${progress}%`
-            : status === "posting"
-            ? "Sending to YouTube…"
-            : "Upload & Post"}
+          {buttonText}
         </button>
         {result && (
           <pre className="whitespace-pre-wrap rounded-md border border-neutral-200 dark:border-neutral-800 p-3 text-xs">
