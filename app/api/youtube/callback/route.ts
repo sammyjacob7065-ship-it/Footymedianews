@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const error = req.nextUrl.searchParams.get("error");
 
   if (error) {
-    return htmlResponse(`<p>Google returned an error: ${error}</p>`);
+    return htmlResponse("<p>Google returned an error: " + error + "</p>");
   }
 
   if (!code) {
@@ -33,11 +33,11 @@ export async function GET(req: NextRequest) {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: clientId!,
-      client_secret: clientSecret!,
-      code,
+      client_id: clientId || "",
+      client_secret: clientSecret || "",
+      code: code,
       grant_type: "authorization_code",
-      redirect_uri: redirectUri!,
+      redirect_uri: redirectUri || "",
     }),
   });
 
@@ -45,41 +45,63 @@ export async function GET(req: NextRequest) {
 
   if (!tokenRes.ok || !data.access_token) {
     const maskedId = clientId
-      ? `${clientId.slice(0, 6)}...${clientId.slice(-6)}`
+      ? clientId.slice(0, 6) + "..." + clientId.slice(-6)
       : "MISSING";
     return htmlResponse(
-      `<p>Token exchange failed:</p><pre>${JSON.stringify(data, null, 2)}</pre>
-       <p style="color:#888">Debug — client id used: ${maskedId}, redirect_uri used: ${redirectUri}</p>`
+      "<p>Token exchange failed:</p><pre>" +
+        JSON.stringify(data, null, 2) +
+        "</pre><p style='color:#888'>Debug — client id used: " +
+        maskedId +
+        ", redirect_uri used: " +
+        redirectUri +
+        "</p>"
     );
   }
 
   const suffix = envSuffix(channel);
-  const refreshVarName = `YOUTUBE_${suffix}_REFRESH_TOKEN`;
+  const refreshVarName = "YOUTUBE_" + suffix + "_REFRESH_TOKEN";
 
-  return htmlResponse(`
-    <p><strong>Connected successfully</strong> for channel: <strong>${channel}</strong></p>
-    <p>Add this to Vercel's Environment Variables — the name matters, it tells the upload route which channel this belongs to:</p>
-    <p><strong>${refreshVarName}</strong></p>
-    <pre>${data.refresh_token ?? "(not returned — see note below)"}</pre>
-    <p style="color:#888">
-    ${
-      !data.refresh_token
-        ? "If no refresh token shows here, it's likely because you'd already authorized this app before with this same Google account — go to myaccount.google.com/permissions, remove access for this app, then try /youtube-login again."
-        : "Access token also issued (expires in " + Math.round((data.expires_in ?? 0) / 60) + " min) but isn't needed — the upload route always fetches a fresh one using this refresh token."
-    }
-    </p>
-    <p>When uploading, use <code>"channel": "${channel}"</code> in the request to /api/youtube/post-video so it picks this token.</p>
-  `);
+  let noteText;
+  if (!data.refresh_token) {
+    noteText =
+      "If no refresh token shows here, it's likely because you'd already authorized this app before with this same Google account — go to myaccount.google.com/permissions, remove access for this app, then try /youtube-login again.";
+  } else {
+    noteText =
+      "Access token also issued (expires in " +
+      Math.round((data.expires_in || 0) / 60) +
+      " min) but isn't needed — the upload route always fetches a fresh one using this refresh token.";
+  }
+
+  const bodyHtml =
+    "<p><strong>Connected successfully</strong> for channel: <strong>" +
+    channel +
+    "</strong></p>" +
+    "<p>Add this to Vercel's Environment Variables — the name matters, it tells the upload route which channel this belongs to:</p>" +
+    "<p><strong>" +
+    refreshVarName +
+    "</strong></p>" +
+    "<pre>" +
+    (data.refresh_token || "(not returned — see note below)") +
+    "</pre>" +
+    "<p style='color:#888'>" +
+    noteText +
+    "</p>" +
+    "<p>When uploading, use channel: '" +
+    channel +
+    "' in the request to /api/youtube/post-video so it picks this token.</p>";
+
+  return htmlResponse(bodyHtml);
 }
 
 function htmlResponse(bodyHtml: string) {
-  return new NextResponse(
-    `<!DOCTYPE html><html><body style="font-family: sans-serif; max-width: 600px; margin: 40px auto; line-height:1.6;">${bodyHtml}</body></html>`,
-    {
-      headers: {
-        "Content-Type": "text/html",
-        "Cache-Control": "no-store, max-age=0",
-      },
-    }
-  );
+  const fullHtml =
+    "<!DOCTYPE html><html><body style='font-family: sans-serif; max-width: 600px; margin: 40px auto; line-height:1.6;'>" +
+    bodyHtml +
+    "</body></html>";
+  return new NextResponse(fullHtml, {
+    headers: {
+      "Content-Type": "text/html",
+      "Cache-Control": "no-store, max-age=0",
+    },
+  });
 }
