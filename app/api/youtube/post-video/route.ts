@@ -14,14 +14,18 @@ async function getFreshAccessToken(channel: string) {
   const clientSecret = process.env.YOUTUBE_CLIENT_SECRET?.trim();
 
   const suffix = envSuffix(channel);
-  const channelSpecificVar = `YOUTUBE_${suffix}_REFRESH_TOKEN`;
+  const channelSpecificVar = "YOUTUBE_" + suffix + "_REFRESH_TOKEN";
   const refreshToken =
     process.env[channelSpecificVar]?.trim() ||
     process.env.YOUTUBE_REFRESH_TOKEN?.trim();
 
   if (!refreshToken) {
     throw new Error(
-      `No refresh token found for channel "${channel}". Expected env var ${channelSpecificVar} (or YOUTUBE_REFRESH_TOKEN as fallback). Connect this channel first at /youtube-login.`
+      "No refresh token found for channel '" +
+        channel +
+        "'. Expected env var " +
+        channelSpecificVar +
+        " (or YOUTUBE_REFRESH_TOKEN as fallback). Connect this channel first at /youtube-login."
     );
   }
 
@@ -29,8 +33,8 @@ async function getFreshAccessToken(channel: string) {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: clientId!,
-      client_secret: clientSecret!,
+      client_id: clientId || "",
+      client_secret: clientSecret || "",
       refresh_token: refreshToken,
       grant_type: "refresh_token",
     }),
@@ -42,12 +46,15 @@ async function getFreshAccessToken(channel: string) {
     data = JSON.parse(rawText);
   } catch {
     throw new Error(
-      `Google's token endpoint returned something unexpected (status ${res.status}): ${rawText.slice(0, 300)}`
+      "Google's token endpoint returned something unexpected (status " +
+        res.status +
+        "): " +
+        rawText.slice(0, 300)
     );
   }
 
   if (!res.ok || !data.access_token) {
-    throw new Error(`Couldn't refresh access token: ${JSON.stringify(data)}`);
+    throw new Error("Couldn't refresh access token: " + JSON.stringify(data));
   }
   return data.access_token as string;
 }
@@ -59,7 +66,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { video_url, title, description, channel } = body ?? {};
+  const { video_url, title, description, channel } = body || {};
   const targetChannel = channel || "football";
 
   if (!video_url || !title) {
@@ -89,7 +96,7 @@ export async function POST(req: NextRequest) {
   const videoBuffer = await videoRes.arrayBuffer();
 
   const metadata = {
-    snippet: { title, description: description ?? "" },
+    snippet: { title: title, description: description || "" },
     status: { privacyStatus: "public" },
   };
 
@@ -98,7 +105,7 @@ export async function POST(req: NextRequest) {
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: "Bearer " + accessToken,
         "Content-Type": "application/json",
         "X-Upload-Content-Type": "video/mp4",
       },
@@ -141,6 +148,6 @@ export async function POST(req: NextRequest) {
     success: true,
     channel: targetChannel,
     video_id: uploadData.id,
-    video_url: `https://youtube.com/watch?v=${uploadData.id}`,
+    video_url: "https://youtube.com/watch?v=" + uploadData.id,
   });
 }
