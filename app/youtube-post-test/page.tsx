@@ -3,15 +3,15 @@
 import { useEffect, useState } from "react";
 import { upload } from "@vercel/blob/client";
 
+type UploadStatus = "idle" | "uploading" | "posting" | "done" | "error";
+
 export default function YoutubePostTestPage() {
   const [token, setToken] = useState("");
   const [channel, setChannel] = useState("football");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [status, setStatus] = useState
-    "idle" | "uploading" | "posting" | "done" | "error"
-  >("idle");
+  const [videoFile, setVideoFile] = useState(null as File | null);
+  const [status, setStatus] = useState("idle" as UploadStatus);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState("");
 
@@ -111,7 +111,7 @@ export default function YoutubePostTestPage() {
         <input
           type="file"
           accept="video/mp4,video/quicktime"
-          onChange={(e) => setVideoFile(e.target.files?.[0] ?? null)}
+          onChange={(e) => setVideoFile(e.target.files ? e.target.files[0] : null)}
           required
           className="text-sm"
         />
