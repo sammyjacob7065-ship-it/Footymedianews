@@ -5,11 +5,10 @@ import { useState } from "react";
 export default function YoutubeLoginPage() {
   const [channel, setChannel] = useState("football");
   const [customChannel, setCustomChannel] = useState("");
-
   const finalChannel = channel === "custom" ? customChannel.trim() : channel;
-  const loginUrl =
-    "/api/youtube/login?channel=" +
-    encodeURIComponent(finalChannel || "default");
+  const safeChannel = finalChannel ? finalChannel : "default";
+  const encodedChannel = encodeURIComponent(safeChannel);
+  const loginUrl = "/api/youtube/login?channel=" + encodedChannel;
 
   return (
     <div className="mx-auto max-w-md px-4 py-16 text-center">
