@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { video_url, title, description, channel } = body || {};
+  const { video_url, title, description, channel, thumbnail_url } = body || {};
   const targetChannel = channel || "football";
 
   if (!video_url || !title) {
@@ -144,10 +144,39 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Cover picture: the film's poster image is sent by the workflow as thumbnail_url.
+  // A thumbnail problem never fails the post: the result is only reported back ("set" or "failed: why").
+  let thumbnail = "none sent";
+  if (thumbnail_url) {
+    try {
+      const tRes = await fetch(thumbnail_url);
+      if (!tRes.ok) throw new Error("could not download the cover (status " + tRes.status + ")");
+      const tBuf = await tRes.arrayBuffer();
+      const tSet = await fetch(
+        "https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=" +
+          encodeURIComponent(uploadData.id) +
+          "&uploadType=media",
+        {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + accessToken,
+            "Content-Type": tRes.headers.get("content-type") || "image/jpeg",
+          },
+          body: tBuf,
+        }
+      );
+      const tText = await tSet.text();
+      thumbnail = tSet.ok ? "set" : "failed (" + tSet.status + "): " + tText.slice(0, 300);
+    } catch (err) {
+      thumbnail = "failed: " + (err instanceof Error ? err.message : String(err));
+    }
+  }
+
   return NextResponse.json({
     success: true,
     channel: targetChannel,
     video_id: uploadData.id,
     video_url: "https://youtube.com/watch?v=" + uploadData.id,
+    thumbnail,
   });
 }
