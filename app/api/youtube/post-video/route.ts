@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// If you turn on Fluid Compute in Vercel you can raise both numbers (for example 300 and 300000).
 export const maxDuration = 60;
+const TIME_BUDGET_MS = 60000;
 
 // ---- Custom thumbnail (optional). It runs only AFTER the video is already posted, and it can never make the post fail. ----
 const THUMB_MAX_BYTES = 2 * 1024 * 1024; // YouTube's limit for a custom thumbnail
@@ -167,29 +169,41 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const videoRes = await fetch(video_url);
-  if (!videoRes.ok) {
+  // v76: the film is STREAMED from storage straight into YouTube. It is never held in memory, so a long full-quality film does not run out of memory or time.
+  let videoRes: Response;
+  try {
+    videoRes = await fetch(video_url, { redirect: "follow" });
+  } catch (err) {
     return NextResponse.json(
-      { error: "Couldn't fetch the uploaded video from storage" },
+      { error: "Couldn't reach the video link: " + (err instanceof Error ? err.message : String(err)) },
       { status: 502 }
     );
   }
-  const videoBuffer = await videoRes.arrayBuffer();
+  if (!videoRes.ok || !videoRes.body) {
+    return NextResponse.json(
+      { error: "Couldn't fetch the uploaded video from storage (HTTP " + videoRes.status + ")" },
+      { status: 502 }
+    );
+  }
+  const videoLength = videoRes.headers.get("content-length");
 
   const metadata = {
     snippet: { title: title, description: description || "" },
     status: { privacyStatus: "public" },
   };
 
+  const initHeaders: Record<string, string> = {
+    Authorization: "Bearer " + accessToken,
+    "Content-Type": "application/json",
+    "X-Upload-Content-Type": "video/mp4",
+  };
+  if (videoLength) initHeaders["X-Upload-Content-Length"] = videoLength;
+
   const initRes = await fetch(
     "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",
     {
       method: "POST",
-      headers: {
-        Authorization: "Bearer " + accessToken,
-        "Content-Type": "application/json",
-        "X-Upload-Content-Type": "video/mp4",
-      },
+      headers: initHeaders,
       body: JSON.stringify(metadata),
     }
   );
@@ -210,17 +224,39 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const uploadRes = await fetch(uploadUrl, {
-    method: "PUT",
-    headers: { "Content-Type": "video/mp4" },
-    body: videoBuffer,
-  });
-
-  const uploadData = await uploadRes.json();
-
-  if (!uploadRes.ok) {
+  let uploadRes: Response;
+  try {
+    if (videoLength) {
+      const putInit = {
+        method: "PUT",
+        headers: { "Content-Type": "video/mp4", "Content-Length": videoLength },
+        body: videoRes.body,
+        duplex: "half",
+      } as RequestInit & { duplex: "half" };
+      uploadRes = await fetch(uploadUrl, putInit);
+    } else {
+      // the storage did not say how big the film is: fall back to holding it in memory
+      const buf = await videoRes.arrayBuffer();
+      uploadRes = await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": "video/mp4" }, body: buf });
+    }
+  } catch (err) {
     return NextResponse.json(
-      { error: "YouTube rejected the video upload", details: uploadData },
+      { error: "The upload to YouTube was cut off: " + (err instanceof Error ? err.message : String(err)) },
+      { status: 502 }
+    );
+  }
+
+  const uploadText = await uploadRes.text();
+  let uploadData: { id?: string } = {};
+  try {
+    uploadData = JSON.parse(uploadText);
+  } catch {
+    // not JSON: handled below
+  }
+
+  if (!uploadRes.ok || !uploadData.id) {
+    return NextResponse.json(
+      { error: "YouTube rejected the video upload (HTTP " + uploadRes.status + ")", details: uploadText.slice(0, 600) },
       { status: 502 }
     );
   }
@@ -231,7 +267,7 @@ export async function POST(req: NextRequest) {
     try {
       const prep = await thumbPrep;
       if (!prep.ok) thumbnailStatus = "skipped: " + prep.reason;
-      else thumbnailStatus = await setThumbnail(accessToken, uploadData.id, prep, startedAt + 52000);
+      else thumbnailStatus = await setThumbnail(accessToken, uploadData.id, prep, startedAt + TIME_BUDGET_MS - 8000);
     } catch (err) {
       thumbnailStatus = "failed: " + (err instanceof Error ? err.message : "unknown error");
     }
